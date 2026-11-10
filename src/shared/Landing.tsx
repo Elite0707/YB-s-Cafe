@@ -4,7 +4,6 @@ import { Link } from "react-router-dom";
 export function Landing() {
   return <main className="yb-home">
     <section className="yb-home-hero" aria-labelledby="yb-home-title">
-      <img className="yb-home-hero-image" src="/images/yb-brewing-exterior.jpg" alt="The YB'S BREWING cafe entrance, lit warmly behind its dark teal frontage" />
       <div className="yb-home-hero-shade" />
       <nav className="yb-nav yb-shell" aria-label="Main navigation">
         <Link to="/" className="yb-brand" aria-label="YB'S BREWING home">

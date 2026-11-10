@@ -1,12 +1,17 @@
 {
-  "name": "YB'S BREWING",
-  "short_name": "YB'S",
-  "description": "Coffee, company, and a little room to slow down.",
+  "name": "Cafe QR Ordering",
+  "short_name": "Cafe Order",
+  "description": "Browse a cafe menu and order from your table.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#14243A",
-  "theme_color": "#14243A",
+  "background_color": "#273e30",
+  "theme_color": "#273e30",
   "icons": [
-    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
   ]
 }

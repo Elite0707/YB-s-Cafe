@@ -1,9 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#14243A"/>
-  <path d="M84 102h344v200a172 172 0 0 1-344 0V102Z" fill="#064653" stroke="#D9B36C" stroke-width="13"/>
-  <path d="M428 151h16a64 64 0 0 1 0 128h-16" fill="none" stroke="#D9B36C" stroke-width="24"/>
-  <path d="M121 345h270" stroke="#F4EBDD" stroke-width="18" stroke-linecap="round"/>
-  <path d="M162 84h188" stroke="#D9B36C" stroke-width="9" stroke-linecap="round"/>
-  <path d="M182 64c-19-20 17-30 0-49m70 49c-19-20 17-30 0-49m70 49c-19-20 17-30 0-49" fill="none" stroke="#F4EBDD" stroke-width="12" stroke-linecap="round"/>
-  <text x="256" y="452" fill="#F4EBDD" font-family="Arial,sans-serif" font-size="45" font-weight="700" letter-spacing="7" text-anchor="middle">YB'S</text>
+  <rect width="512" height="512" rx="112" fill="#273e30"/>
+  <path d="M133 175h224v133a112 112 0 0 1-224 0V175Z" fill="#f2e7d3"/>
+  <path d="M357 201h19a48 48 0 0 1 0 96h-19" fill="none" stroke="#f2e7d3" stroke-width="20"/>
+  <path d="M116 340h258" stroke="#e5a47e" stroke-width="20" stroke-linecap="round"/>
+  <path d="M190 144c-20-22 18-34 0-56m67 56c-20-22 18-34 0-56m67 56c-20-22 18-34 0-56" fill="none" stroke="#e5a47e" stroke-width="13" stroke-linecap="round"/>
 </svg>

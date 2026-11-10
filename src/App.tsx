@@ -7,7 +7,7 @@ const OrderTracking = lazy(() => import("./customer/Customer").then((module) => 
 const AdminShell = lazy(() => import("./admin/Admin").then((module) => ({ default: module.AdminShell })));
 const AdminLogin = lazy(() => import("./admin/Admin").then((module) => ({ default: module.AdminLogin })));
 const AdminSetup = lazy(() => import("./admin/Admin").then((module) => ({ default: module.AdminSetup })));
-const adminLoading = <div className="customer-loading"><span className="loader" /><p>Opening the counter…</p></div>;
+const adminLoading = <div className="customer-loading"><span className="loader" /><p>Loading your cafe workspace…</p></div>;
 
 export default function App() {
   return <Routes>

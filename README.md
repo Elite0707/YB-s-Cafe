@@ -47,21 +47,6 @@ The Vite dev server proxies `/api` to `http://localhost:3000`. To open the devel
 5. Terminate TLS at a trusted reverse proxy, forward the original protocol, and configure Express proxy trust only for that proxy. Restrict database volume access to the service account.
 6. Back up the database on a schedule. Use SQLite's online backup API or stop the service before copying the database together with any WAL files. Test restore procedures. Retain backups according to local payment and privacy requirements.
 
-### Netlify deployment and database
-
-Netlify's static site hosting serves the React/Vite files; it does not run this repository's Express API. The client sends sign-in requests to `/api/auth/login`, so deploying only the `dist/` folder to Netlify makes those requests return 404. The app's SQLite database is also a local file and must live on persistent server storage; a serverless function's temporary filesystem is not a safe database.
-
-The included [Render Blueprint](render.yaml) deploys the built frontend and Express API together and mounts a persistent disk at `/var/data` for the SQLite database and uploaded images. It uses Render's Starter web-service plan because Render's free web services do not support persistent disks.
-
-1. In Render, create a **Blueprint** from this GitHub repository and approve the `ybs-cafe` service. Review the plan and disk cost before creating it.
-2. Wait for the deploy to finish, then open the service URL. `/api/health` should return `{"status":"ok", ...}`.
-3. In Render's Environment settings, reveal the generated `SETUP_KEY`. Visit `<your-render-url>/admin/setup` and use that key to create the cafe owner. The generated `SESSION_SECRET` is already configured.
-4. Use the Render service URL for the app and its QR codes. The Render-hosted service serves both the UI and `/api`, so sign-in stays same-origin. The existing Netlify static deployment can be retired or kept as a separate preview; it will continue to show API 404s until a backend proxy is configured.
-5. The database is `/var/data/cafe.sqlite`; uploads are stored at `/var/data/uploads`. Back up the persistent disk regularly. A fresh Render service starts with a new database, so recreate your cafe, categories, menu, and tables unless you arrange a secure migration from an existing database.
-6. Online card payments remain disabled until you add Stripe's `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and set `APP_BASE_URL` to the final public HTTPS URL in Render's Environment settings. Cash payments work without Stripe.
-
-Do not set `DATABASE_PATH` to a Netlify build directory or commit the local `data/cafe.sqlite` file. Neither is durable production storage.
-
 This starter uses a single-writer SQLite database, which is appropriate for an individual small cafe and low-to-moderate traffic. For a larger multi-instance deployment, migrate to PostgreSQL and shared session/event infrastructure before scaling horizontally.
 
 ## Operations and data

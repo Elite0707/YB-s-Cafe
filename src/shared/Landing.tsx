@@ -1,5 +1,6 @@
 import { ArrowRight, Check, Coffee, QrCode } from "lucide-react";
 import { Link } from "react-router-dom";
+import { ThemeToggle } from "./ThemeToggle";
 
 export function Landing() {
   return <main className="landing-page">
@@ -9,7 +10,7 @@ export function Landing() {
         <span className="brand-mark"><Coffee size={18} /></span>
         <span>Cafe Ordering</span>
       </Link>
-      <Link to="/admin/login" className="quiet-link">Cafe team? <span>Sign in <ArrowRight size={14} /></span></Link>
+      <div className="landing-nav-actions"><ThemeToggle /><Link to="/admin/login" className="quiet-link">Cafe team? <span>Sign in <ArrowRight size={14} /></span></Link></div>
     </nav>
     <section className="landing-hero">
       <div className="landing-copy">

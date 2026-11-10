@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ArrowRight, Check, Clock3, Leaf, Minus, Plus, Search, ShoppingBag, ShoppingBasket, Sparkles, X } from "lucide-react";
 import { api, friendlyError, jsonBody } from "../api";
 import { Cafe, formatMoney, MenuItem, Order, OptionGroup, PublicMenu } from "../types";
+import { ThemeToggle } from "../shared/ThemeToggle";
 
 type CartLine = { key: string; itemId: string; quantity: number; optionChoiceIds: string[]; notes: string };
 const cartKey = (token: string) => `tablefolk-cart-${token}`;
@@ -110,7 +111,7 @@ export function CustomerMenu() {
   const { cafe, table, categories } = menu;
 
   return <main className="customer-page" style={{ "--cafe-accent": cafe.accentColor || "#597958" } as React.CSSProperties}>
-    <header className="customer-header"><div className="cafe-brand">{cafe.logoUrl ? <img src={cafe.logoUrl} alt="" /> : <span className="cafe-monogram">{cafe.name.slice(0, 1)}</span>}<span className="cafe-name">{cafe.name}</span></div><span className="table-pill"><span className="table-pill-dot" /> {table.name}</span></header>
+    <header className="customer-header"><div className="cafe-brand">{cafe.logoUrl ? <img src={cafe.logoUrl} alt="" /> : <span className="cafe-monogram">{cafe.name.slice(0, 1)}</span>}<span className="cafe-name">{cafe.name}</span></div><div className="customer-header-actions"><ThemeToggle /><span className="table-pill"><span className="table-pill-dot" /> {table.name}</span></div></header>
     <section className="customer-welcome"><div className="customer-welcome-copy"><span className="eyebrow eyebrow-green">YOUR TABLE IS READY</span><h1>Good food.<br /><em>Good company.</em></h1><p>{cafe.description || "Browse the menu, make it your own, and order from your table."}</p></div><div className="welcome-illustration" aria-hidden="true"><div className="welcome-stem" /><div className="welcome-leaf" /><div className="welcome-cup"><div /></div><div className="welcome-saucer" /></div></section>
     <section className="menu-intro"><div><span className="eyebrow eyebrow-muted">THE MENU</span><h2>Find your <em>favorite.</em></h2></div><div className="menu-search"><Search size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} aria-label="Search menu" placeholder="Coffee, something sweet…" /><kbd>⌘ K</kbd></div></section>
     <nav className="category-nav" aria-label="Menu categories"><button className={activeCategory === "all" ? "category-chip active" : "category-chip"} onClick={() => setActiveCategory("all")}>Everything</button>{categories.map((category) => <button key={category.id} className={activeCategory === category.id ? "category-chip active" : "category-chip"} onClick={() => setActiveCategory(category.id)}>{category.name}</button>)}</nav>
@@ -192,7 +193,7 @@ export function OrderTracking() {
   const cancelled = order.status.toUpperCase() === "CANCELLED";
   const stageLabels = ["Order received", "Confirmed", "Being prepared", "Ready to enjoy", "Served", "All yours"];
   return <main className="order-state-page"><div className="order-state-card">
-    <a className="back-link" href="/"> <ArrowLeft size={15} /> Back to menu</a>
+    <div className="order-state-top"><a className="back-link" href="/"> <ArrowLeft size={15} /> Back to menu</a><ThemeToggle /></div>
     <div className={cancelled ? "status-emblem status-cancelled" : "status-emblem"}>{cancelled ? "×" : currentIndex >= 3 ? "✓" : <span className="pulse-dot" />}</div>
     <span className="eyebrow eyebrow-green">{cafe?.name || "YOUR CAFE"}{tableName ? ` · ${tableName}` : ""}</span><h1>{cancelled ? "This order was cancelled" : order.status === "READY" ? "A little something is ready." : order.status === "COMPLETED" ? "Hope you enjoyed it." : "Your order is in good hands."}</h1><p className="order-state-subtitle">{cancelled ? "Please ask a team member if you need help." : order.status === "PREPARING" ? "The team is making everything fresh for you." : "We’ll keep this page up to date for you."}</p>
     <div className="order-reference"><span>ORDER NUMBER</span><b>#{order.orderNumber}</b><small>{new Date(order.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</small></div>

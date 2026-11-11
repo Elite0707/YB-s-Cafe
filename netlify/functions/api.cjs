@@ -1,9 +1,12 @@
 const serverless = require('serverless-http');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 
 // Netlify's generated Lambda entry loads this adapter with require().
 process.env.NETLIFY = 'true';
 
-const initialization = import('../../server/dist/app.js')
+const appModuleUrl = pathToFileURL(path.resolve(__dirname, '../../server/dist/app.js')).href;
+const initialization = import(appModuleUrl)
   .then(({ app }) => ({ handler: serverless(app) }))
   .catch((error) => ({ error }));
 

@@ -5,7 +5,7 @@
 
 [functions]
   node_bundler = "esbuild"
-  included_files = ["server/dist/**/*.js", "package.json", "db/pg-migrations/*.sql"]
+  included_files = ["server/package.json", "server/dist/**/*.js", "db/pg-migrations/*.sql"]
   external_node_modules = ["express", "serverless-http", "express-session", "express-rate-limit", "helmet", "bcryptjs", "stripe", "zod", "pg", "files-sdk", "@aws-sdk/client-s3", "@aws-sdk/s3-presigned-post", "@aws-sdk/s3-request-presigner"]
 
 [[redirects]]

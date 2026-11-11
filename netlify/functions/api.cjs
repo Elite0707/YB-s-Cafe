@@ -3,9 +3,25 @@ const serverless = require('serverless-http');
 // Netlify's generated Lambda entry loads this adapter with require().
 process.env.NETLIFY = 'true';
 
-const handlerPromise = import('../../server/dist/app.js').then(({ app }) => serverless(app));
+const initialization = import('../../server/dist/app.js')
+  .then(({ app }) => ({ handler: serverless(app) }))
+  .catch((error) => ({ error }));
 
 exports.handler = async (event, context) => {
-  const handler = await handlerPromise;
-  return handler(event, context);
+  const result = await initialization;
+  if ('error' in result) {
+    const message = String(result.error?.message || result.error || 'Unknown startup error');
+    console.error('API app initialization failed:', result.error);
+    const safeMessage = [process.env.DATABASE_URL, process.env.SESSION_SECRET]
+      .filter(Boolean)
+      .reduce((value, secret) => value.split(secret).join('[redacted]'), message)
+      .slice(0, 400);
+    return {
+      statusCode: 503,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ error: 'API app initialization failed', detail: safeMessage }),
+    };
+  }
+
+  return result.handler(event, context);
 };

@@ -10,3 +10,5 @@ data/uploads/
 !.env.example
 coverage/
 *.log
+.neon
+.neon-cli/

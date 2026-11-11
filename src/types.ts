@@ -41,6 +41,7 @@ export type Order = {
   tableName?: string;
   cafeName?: string;
   currency?: string;
+  menuPath?: string;
   estimatedMinutes?: number;
   items: OrderLine[];
 };

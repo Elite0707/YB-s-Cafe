@@ -1145,6 +1145,10 @@ kbd { min-width: 22px; border: 1px solid #e8e8df; border-radius: 5px; padding: 2
   [data-theme="dark"] .admin-content .payment-list-row.needs-reconciliation { background: #30291f; }
   [data-theme="dark"] .admin-content .reconciliation-banner { border-color: #68473b; color: #f0c0a7 !important; background: #3b2b25; }
   [data-theme="dark"] .admin-content .reconciliation-banner small { color: #d6ad98 !important; }
+  [data-theme="dark"] .admin-content .inline-error-bar { border-color: #70483e; color: #ffd0c4; background: #3f2d28; }
+  [data-theme="dark"] .admin-content .inline-error-bar span { color: #ffd0c4; }
+  [data-theme="dark"] .admin-content .inline-error-bar button { color: #ffc1b1; }
+  [data-theme="dark"] .admin-content .inline-error-bar button:hover { color: #fff0e9; }
   [data-theme="dark"] .admin-global-error { border-color: #70483e; color: #f1c1b2; background: #3f2d28; }
   [data-theme="dark"] .admin-nav-link.active { color: #e7dbb9; }
 

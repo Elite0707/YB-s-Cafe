@@ -181,9 +181,7 @@ export function OrderTracking() {
     const load = () => api<{ order: Order; cafe?: Cafe; tableName?: string }>(`/api/public/orders/${encodeURIComponent(trackingToken)}`).then((data) => { if (alive) { const currentOrder = data.order; setOrder(currentOrder); if (data.cafe) setCafe(data.cafe); if (currentOrder?.tableName) setTableName(currentOrder.tableName); if (currentOrder?.currency) setCafe((previous) => previous ?? ({ id: "", name: currentOrder.cafeName || "", slug: "", currency: currentOrder.currency || "INR", taxBps: 0 })); setError(""); } }).catch((reason) => { if (alive) setError(friendlyError(reason)); }).finally(() => { if (alive) setLoading(false); });
     void load();
     const poll = window.setInterval(() => { void load(); }, 7000);
-    const stream = new EventSource(`/api/public/orders/${encodeURIComponent(trackingToken)}/events`);
-    stream.addEventListener("order", (message) => { try { const payload = JSON.parse((message as MessageEvent).data); setOrder(payload.order ?? payload); } catch { void load(); } });
-    return () => { alive = false; window.clearInterval(poll); stream.close(); };
+    return () => { alive = false; window.clearInterval(poll); };
   }, [trackingToken]);
   if (loading) return <div className="customer-loading"><span className="loader" /><p>Finding your order…</p></div>;
   if (error && !order) return <main className="order-state-page"><div className="order-state-card"><span className="status-emblem">?</span><h1>We can’t find that order</h1><p>{error}</p><a className="button button-dark" href="/">Back to cafe home</a></div></main>;
@@ -193,7 +191,7 @@ export function OrderTracking() {
   const cancelled = order.status.toUpperCase() === "CANCELLED";
   const stageLabels = ["Order received", "Confirmed", "Being prepared", "Ready to enjoy", "Served", "All yours"];
   return <main className="order-state-page"><div className="order-state-card">
-    <div className="order-state-top"><a className="back-link" href="/"> <ArrowLeft size={15} /> Back to menu</a><ThemeToggle /></div>
+    <div className="order-state-top"><Link className="back-link" to={order.menuPath || "/"}> <ArrowLeft size={15} /> Back to menu</Link><ThemeToggle /></div>
     <div className={cancelled ? "status-emblem status-cancelled" : "status-emblem"}>{cancelled ? "×" : currentIndex >= 3 ? "✓" : <span className="pulse-dot" />}</div>
     <span className="eyebrow eyebrow-green">{cafe?.name || "YOUR CAFE"}{tableName ? ` · ${tableName}` : ""}</span><h1>{cancelled ? "This order was cancelled" : order.status === "READY" ? "A little something is ready." : order.status === "COMPLETED" ? "Hope you enjoyed it." : "Your order is in good hands."}</h1><p className="order-state-subtitle">{cancelled ? "Please ask a team member if you need help." : order.status === "PREPARING" ? "The team is making everything fresh for you." : "We’ll keep this page up to date for you."}</p>
     <div className="order-reference"><span>ORDER NUMBER</span><b>#{order.orderNumber}</b><small>{new Date(order.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</small></div>

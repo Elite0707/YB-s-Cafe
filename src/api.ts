@@ -25,7 +25,7 @@ export function jsonBody(value: unknown) { return JSON.stringify(value); }
 export async function uploadImage(file: File): Promise<{ url: string }> {
   const allowedTypes = ["image/png", "image/jpeg", "image/webp"];
   if (!allowedTypes.includes(file.type)) throw new Error("Choose a PNG, JPEG, or WebP image.");
-  if (file.size > 5 * 1024 * 1024) throw new Error("Choose an image smaller than 5 MB.");
+  if (file.size > 4 * 1024 * 1024) throw new Error("Choose an image smaller than 4 MB.");
   const response = await fetch("/api/admin/uploads", { method: "POST", credentials: "same-origin", headers: { "Content-Type": file.type }, body: file });
   if (!response.ok) {
     let message = `Image upload failed (${response.status})`;

@@ -1,7 +1,10 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import express from 'express';
-import { app } from './app.js';
+
+const { migrateDatabase } = await import('./db.js');
+await migrateDatabase();
+const { app } = await import('./app.js');
 
 const port = Number(process.env.PORT || 3000);
 const dist = path.resolve(process.cwd(), 'dist');

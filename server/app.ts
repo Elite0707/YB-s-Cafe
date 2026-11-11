@@ -17,6 +17,9 @@ declare module 'express-session' {
 
 const app = express();
 const isProduction = process.env.NODE_ENV === 'production';
+const formatCsvMoney = (minorUnits: number, currency: string) => new Intl.NumberFormat('en-IN', {
+  style: 'currency', currency, minimumFractionDigits: 0, maximumFractionDigits: 2,
+}).format(Number(minorUnits) / 100);
 const trustProxySetting = process.env.TRUST_PROXY?.trim();
 if (trustProxySetting) app.set('trust proxy', /^\d+$/.test(trustProxySetting) ? Number(trustProxySetting) : trustProxySetting.split(',').map((entry) => entry.trim()).filter(Boolean));
 else if (process.env.NETLIFY) app.set('trust proxy', 1);
@@ -625,32 +628,32 @@ app.get('/api/admin/payments.csv', requireAdmin, async (req, res) => {
   const status = String(req.query.status || ''); const method = String(req.query.method || '');
   const validStatuses = ['UNPAID','PENDING','PAID','FAILED','REFUNDED']; const validMethods = ['CASH_COUNTER','CASH_TABLE','ONLINE'];
   if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || from > to || (status && !validStatuses.includes(status)) || (method && !validMethods.includes(method))) return res.status(400).json({ error: 'Use valid dates, payment status, and method filters.' });
-  const rows = await db.prepare(`SELECT p.id AS payment_id,o.order_number,t.name AS table_name,p.created_at,p.method,p.status,p.amount_cents,p.provider_reference,p.refund_reference
-    FROM payments p JOIN orders o ON o.id=p.order_id JOIN cafe_tables t ON t.id=o.table_id
+  const rows = await db.prepare(`SELECT p.id AS payment_id,o.order_number,t.name AS table_name,p.created_at,p.method,p.status,p.amount_cents,c.currency,p.provider_reference,p.refund_reference
+    FROM payments p JOIN orders o ON o.id=p.order_id JOIN cafe_tables t ON t.id=o.table_id JOIN cafes c ON c.id=p.cafe_id
     WHERE p.cafe_id=? AND p.created_at>=? AND p.created_at<=? AND (?='' OR p.status=?) AND (?='' OR p.method=?) ORDER BY p.created_at`).all(adminCafe(req),`${from}T00:00:00.000Z`,`${to}T23:59:59.999Z`,status,status,method,method) as any[];
   const csvCell = (value: unknown) => {
     let text = String(value ?? '');
     if (/^[\s]*[=+\-@]/.test(text)) text = `'${text}`;
     return `"${text.replaceAll('"','""')}"`;
   };
-  const lines = [['payment_id','order_number','table','created_at','method','status','amount_cents','provider_reference','refund_reference'].map(csvCell).join(',')];
-  for (const row of rows) lines.push([row.payment_id,row.order_number,row.table_name,row.created_at,row.method,row.status,row.amount_cents,row.provider_reference,row.refund_reference].map(csvCell).join(','));
-  res.type('text/csv').attachment(`cafe-payments-${from}-to-${to}.csv`).send(lines.join('\r\n'));
+  const lines = [['payment_id','order_number','table','created_at','method','status','amount_rupees','provider_reference','refund_reference'].map(csvCell).join(',')];
+  for (const row of rows) lines.push([row.payment_id,row.order_number,row.table_name,row.created_at,row.method,row.status,formatCsvMoney(row.amount_cents,row.currency),row.provider_reference,row.refund_reference].map(csvCell).join(','));
+  res.type('text/csv').attachment(`cafe-payments-${from}-to-${to}.csv`).send(`\uFEFF${lines.join('\r\n')}`);
 });
 
 app.get('/api/admin/reports.csv', requireAdmin, async (req, res) => {
   const from = typeof req.query.from === 'string' ? req.query.from : new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
   const to = typeof req.query.to === 'string' ? req.query.to : new Date().toISOString().slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || from > to) return res.status(400).json({ error: 'Use valid from/to dates.' });
-  const rows = await db.prepare(`SELECT o.order_number,t.name AS table_name,o.created_at,o.status,o.payment_method,o.payment_status,o.subtotal_cents,o.tax_cents,o.total_cents,STRING_AGG(oi.quantity::text || 'x ' || oi.item_name, '; ') AS items FROM orders o JOIN cafe_tables t ON t.id=o.table_id LEFT JOIN order_items oi ON oi.order_id=o.id WHERE o.cafe_id=? AND o.created_at>=? AND o.created_at<=? GROUP BY o.id,t.name ORDER BY o.created_at`).all(adminCafe(req),`${from}T00:00:00.000Z`,`${to}T23:59:59.999Z`) as any[];
+  const rows = await db.prepare(`SELECT o.order_number,t.name AS table_name,o.created_at,o.status,o.payment_method,o.payment_status,o.subtotal_cents,o.tax_cents,o.total_cents,c.currency,STRING_AGG(oi.quantity::text || 'x ' || oi.item_name, '; ') AS items FROM orders o JOIN cafe_tables t ON t.id=o.table_id JOIN cafes c ON c.id=o.cafe_id LEFT JOIN order_items oi ON oi.order_id=o.id WHERE o.cafe_id=? AND o.created_at>=? AND o.created_at<=? GROUP BY o.id,t.name ORDER BY o.created_at`).all(adminCafe(req),`${from}T00:00:00.000Z`,`${to}T23:59:59.999Z`) as any[];
   const csvCell = (value: unknown) => {
     let text = String(value ?? '');
     if (/^[\s]*[=+\-@]/.test(text)) text = `'${text}`;
     return `"${text.replaceAll('"','""')}"`;
   };
-  const lines = [['order_number','table','created_at','status','payment_method','payment_status','subtotal_cents','tax_cents','total_cents','items'].map(csvCell).join(',')];
-  for (const row of rows) lines.push([row.order_number,row.table_name,row.created_at,row.status,row.payment_method,row.payment_status,row.subtotal_cents,row.tax_cents,row.total_cents,row.items].map(csvCell).join(','));
-  res.type('text/csv').attachment(`cafe-orders-${from}-to-${to}.csv`).send(lines.join('\r\n'));
+  const lines = [['order_number','table','created_at','status','payment_method','payment_status','subtotal_rupees','tax_rupees','total_rupees','items'].map(csvCell).join(',')];
+  for (const row of rows) lines.push([row.order_number,row.table_name,row.created_at,row.status,row.payment_method,row.payment_status,formatCsvMoney(row.subtotal_cents,row.currency),formatCsvMoney(row.tax_cents,row.currency),formatCsvMoney(row.total_cents,row.currency),row.items].map(csvCell).join(','));
+  res.type('text/csv').attachment(`cafe-orders-${from}-to-${to}.csv`).send(`\uFEFF${lines.join('\r\n')}`);
 });
 
 app.use((error: any, _req: Request, res: Response, _next: NextFunction) => {

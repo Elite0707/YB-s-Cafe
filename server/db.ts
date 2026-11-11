@@ -2,7 +2,6 @@ import pg from 'pg';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 
 const { Pool } = pg;
@@ -67,14 +66,13 @@ export const db = {
   async close() { await pool.end(); },
 };
 
-const here = path.dirname(fileURLToPath(import.meta.url));
 export const uploadsDirectory = process.env.UPLOADS_PATH ? path.resolve(process.env.UPLOADS_PATH) : path.resolve(process.cwd(), 'data/uploads');
 
 async function migrate() {
   const candidates = [
     path.resolve(process.cwd(), 'db/pg-migrations'),
-    path.resolve(here, '../db/pg-migrations'),
-    path.resolve(here, '../../db/pg-migrations'),
+    path.resolve(process.cwd(), '../db/pg-migrations'),
+    path.resolve(process.cwd(), '../../db/pg-migrations'),
   ];
   const migrationDirectory = candidates.find((candidate) => fs.existsSync(candidate));
   if (!migrationDirectory) throw new Error('PostgreSQL migrations db/pg-migrations were not found.');

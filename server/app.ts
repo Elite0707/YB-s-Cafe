@@ -645,7 +645,7 @@ app.get('/api/admin/reports.csv', requireAdmin, async (req, res) => {
   const from = typeof req.query.from === 'string' ? req.query.from : new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
   const to = typeof req.query.to === 'string' ? req.query.to : new Date().toISOString().slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || from > to) return res.status(400).json({ error: 'Use valid from/to dates.' });
-  const rows = await db.prepare(`SELECT o.order_number,t.name AS table_name,o.created_at,o.status,o.payment_method,o.payment_status,o.subtotal_cents,o.tax_cents,o.total_cents,c.currency,STRING_AGG(oi.quantity::text || 'x ' || oi.item_name, '; ') AS items FROM orders o JOIN cafe_tables t ON t.id=o.table_id JOIN cafes c ON c.id=o.cafe_id LEFT JOIN order_items oi ON oi.order_id=o.id WHERE o.cafe_id=? AND o.created_at>=? AND o.created_at<=? GROUP BY o.id,t.name ORDER BY o.created_at`).all(adminCafe(req),`${from}T00:00:00.000Z`,`${to}T23:59:59.999Z`) as any[];
+  const rows = await db.prepare(`SELECT o.order_number,t.name AS table_name,o.created_at,o.status,o.payment_method,o.payment_status,o.subtotal_cents,o.tax_cents,o.total_cents,c.currency,STRING_AGG(oi.quantity::text || 'x ' || oi.item_name, '; ') AS items FROM orders o JOIN cafe_tables t ON t.id=o.table_id JOIN cafes c ON c.id=o.cafe_id LEFT JOIN order_items oi ON oi.order_id=o.id WHERE o.cafe_id=? AND o.created_at>=? AND o.created_at<=? GROUP BY o.id,t.name,c.currency ORDER BY o.created_at`).all(adminCafe(req),`${from}T00:00:00.000Z`,`${to}T23:59:59.999Z`) as any[];
   const csvCell = (value: unknown) => {
     let text = String(value ?? '');
     if (/^[\s]*[=+\-@]/.test(text)) text = `'${text}`;

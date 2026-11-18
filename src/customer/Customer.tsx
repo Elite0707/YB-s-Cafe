@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ArrowRight, Check, Clock3, Leaf, Minus, Plus, Search, ShoppingBag, ShoppingBasket, Sparkles, X } from "lucide-react";
 import { api, friendlyError, jsonBody } from "../api";
-import { Cafe, formatMoney, MenuItem, Order, OptionGroup, PublicMenu } from "../types";
+import { Cafe, formatMoney, MenuItem, Order, PublicMenu } from "../types";
 import { ThemeToggle } from "../shared/ThemeToggle";
 
 type CartLine = { key: string; itemId: string; quantity: number; optionChoiceIds: string[]; notes: string };
@@ -160,12 +160,6 @@ function ItemModal({ item, currency, onClose, onAdd }: { item: MenuItem; currenc
   const [notes, setNotes] = useState("");
   const [validation, setValidation] = useState("");
   const selectedAddOn = (item.options ?? []).flatMap((group) => group.choices).filter((choice) => choiceIds.includes(choice.id)).reduce((sum, choice) => sum + choice.priceDeltaCents, 0);
-  function toggle(group: OptionGroup, choiceId: string) {
-    setChoiceIds((ids) => ids.includes(choiceId)
-      ? ids.filter((id) => id !== choiceId)
-      : [...ids.filter((id) => !group.choices.some((choice) => choice.id === id)), choiceId]);
-    setValidation("");
-  }
   function add() {
     const missing = (item.options ?? []).some((group) => group.required && !group.choices.some((choice) => choiceIds.includes(choice.id)));
     if (missing) { setValidation("Choose one option to continue."); return; }
@@ -175,7 +169,7 @@ function ItemModal({ item, currency, onClose, onAdd }: { item: MenuItem; currenc
     <button className="modal-close icon-button" onClick={onClose} aria-label="Close item details"><X size={20} /></button>
     <div className="modal-photo">{item.imageUrl ? <img src={item.imageUrl} alt={item.name} /> : <div className="food-placeholder food-placeholder-large"><span>{item.name.slice(0, 1)}</span></div>}</div>
     <div className="modal-content"><div className="modal-heading"><div><span className="eyebrow eyebrow-muted">MADE TO ORDER</span><h2 id="item-modal-title">{item.name}</h2></div><b>{formatMoney(item.priceCents + selectedAddOn, currency)}</b></div><p className="modal-description">{item.description}</p>{item.allergens?.length ? <p className="allergen-note">Contains: {item.allergens.join(", ")}</p> : null}
-      {(item.options ?? []).map((group) => <fieldset className="option-group" key={group.id}><legend>{group.label}<span>{group.required ? "Choose one" : "Optional · one choice"}</span></legend>{group.choices.map((choice) => <label key={choice.id} className="option-choice"><span><b>{choice.label}</b>{choice.priceDeltaCents > 0 && <small>+ {formatMoney(choice.priceDeltaCents, currency)}</small>}</span><input type="radio" name={`choice-${item.id}-${group.id}`} checked={choiceIds.includes(choice.id)} onClick={(event) => { if (choiceIds.includes(choice.id)) { event.preventDefault(); toggle(group, choice.id); } }} onChange={() => toggle(group, choice.id)} aria-label={`${choice.label}${choice.priceDeltaCents ? ` plus ${formatMoney(choice.priceDeltaCents, currency)}` : ""}`} /><span className="custom-check"><Check size={12} /></span></label>)}</fieldset>)}
+      {(item.options ?? []).map((group) => <fieldset className="option-group" key={group.id}><legend>{group.label}<span>{group.required ? "Choose one" : "Optional · one choice"}</span></legend>{group.choices.map((choice) => <label key={choice.id} className="option-choice"><span><b>{choice.label}</b>{choice.priceDeltaCents > 0 && <small>+ {formatMoney(choice.priceDeltaCents, currency)}</small>}</span><input type="checkbox" role="radio" aria-checked={choiceIds.includes(choice.id)} checked={choiceIds.includes(choice.id)} onChange={(event) => { const selected = event.currentTarget.checked; setChoiceIds((ids) => selected ? [...ids.filter((id) => !group.choices.some((entry) => entry.id === id)), choice.id] : ids.filter((id) => id !== choice.id)); setValidation(""); }} aria-label={`${choice.label}${choice.priceDeltaCents ? ` plus ${formatMoney(choice.priceDeltaCents, currency)}` : ""}`} /><span className="custom-check"><Check size={12} /></span></label>)}</fieldset>)}
       <label className="field-label">A note for the barista <span>Optional</span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Oat milk, extra hot, no rush…" maxLength={180} /></label>{validation && <p role="alert" className="inline-error">{validation}</p>}<button className="button button-dark button-full" onClick={add}>Add to my order <span>{formatMoney(item.priceCents + selectedAddOn, currency)}</span></button></div>
   </section></div>;
 }

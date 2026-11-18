@@ -534,8 +534,11 @@ const statuses = ['PENDING','CONFIRMED','PREPARING','READY','SERVED','COMPLETED'
 const transitions: Record<string, string[]> = { PENDING: ['CONFIRMED','CANCELLED'], CONFIRMED: ['PREPARING','CANCELLED'], PREPARING: ['READY','CANCELLED'], READY: ['SERVED','CANCELLED'], SERVED: ['COMPLETED'], COMPLETED: [], CANCELLED: [] };
 app.get('/api/admin/orders', requireAdmin, async (req, res) => {
   const cafe = adminCafe(req); const status = String(req.query.status || ''); const q = String(req.query.q || '').trim().slice(0, 80);
+  const from = typeof req.query.from === 'string' ? req.query.from : ''; const to = typeof req.query.to === 'string' ? req.query.to : '';
+  const validIso = (value: string) => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) && Number.isFinite(Date.parse(value));
   if (status && !statuses.includes(status as any)) return res.status(400).json({ error: 'Invalid order status.' });
-  const rows = await db.prepare(`SELECT o.*,t.name AS table_name,t.qr_token AS table_qr_token,c.name AS cafe_name,c.currency FROM orders o JOIN cafe_tables t ON t.id=o.table_id JOIN cafes c ON c.id=o.cafe_id WHERE o.cafe_id=? AND (?='' OR o.status=?) AND (?='' OR CAST(o.order_number AS TEXT) LIKE ? OR t.name LIKE ? OR EXISTS(SELECT 1 FROM order_items i WHERE i.order_id=o.id AND i.item_name LIKE ?)) ORDER BY CASE o.status WHEN 'PENDING' THEN 0 WHEN 'CONFIRMED' THEN 1 WHEN 'PREPARING' THEN 2 WHEN 'READY' THEN 3 ELSE 4 END,o.created_at LIMIT 250`).all(cafe,status,status,q,`%${q}%`,`%${q}%`,`%${q}%`) as any[];
+  if ((from || to) && (!validIso(from) || !validIso(to) || from > to)) return res.status(400).json({ error: 'Invalid order date range.' });
+  const rows = await db.prepare(`SELECT o.*,t.name AS table_name,t.qr_token AS table_qr_token,c.name AS cafe_name,c.currency FROM orders o JOIN cafe_tables t ON t.id=o.table_id JOIN cafes c ON c.id=o.cafe_id WHERE o.cafe_id=? AND (?='' OR o.status=?) AND (?='' OR CAST(o.order_number AS TEXT) LIKE ? OR t.name LIKE ? OR EXISTS(SELECT 1 FROM order_items i WHERE i.order_id=o.id AND i.item_name LIKE ?)) AND (?='' OR o.created_at>=?) AND (?='' OR o.created_at<=?) ORDER BY CASE o.status WHEN 'PENDING' THEN 0 WHEN 'CONFIRMED' THEN 1 WHEN 'PREPARING' THEN 2 WHEN 'READY' THEN 3 ELSE 4 END,o.created_at LIMIT 250`).all(cafe,status,status,q,`%${q}%`,`%${q}%`,`%${q}%`,from,from,to,to) as any[];
   res.json({ orders: await Promise.all(rows.map((row) => presentOrder(row, false))) });
 });
 app.patch('/api/admin/orders/:id', requireAdmin, async (req, res) => {
@@ -553,7 +556,10 @@ app.patch('/api/admin/orders/:id', requireAdmin, async (req, res) => {
 
 app.get('/api/admin/payments', requireAdmin, async (req, res) => {
   const method = String(req.query.method || ''); const status = String(req.query.status || '');
-  const rows = await db.prepare(`SELECT p.id,p.order_id AS orderId,p.method,p.status,p.amount_cents AS amountCents,p.provider_reference AS reference,p.refund_reference AS refundReference,p.created_at AS createdAt,p.updated_at AS updatedAt,o.order_number AS orderNumber,o.payment_status AS orderPaymentStatus,o.status AS orderStatus,t.name AS tableName FROM payments p JOIN orders o ON o.id=p.order_id JOIN cafe_tables t ON t.id=o.table_id WHERE p.cafe_id=? AND (?='' OR p.method=?) AND (?='' OR p.status=?) ORDER BY p.created_at DESC LIMIT 500`).all(adminCafe(req),method,method,status,status);
+  const from = typeof req.query.from === 'string' ? req.query.from : ''; const to = typeof req.query.to === 'string' ? req.query.to : '';
+  const validIso = (value: string) => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) && Number.isFinite(Date.parse(value));
+  if ((from || to) && (!validIso(from) || !validIso(to) || from > to)) return res.status(400).json({ error: 'Invalid payment date range.' });
+  const rows = await db.prepare(`SELECT p.id,p.order_id AS orderId,p.method,p.status,p.amount_cents AS amountCents,p.provider_reference AS reference,p.refund_reference AS refundReference,p.created_at AS createdAt,p.updated_at AS updatedAt,o.order_number AS orderNumber,o.payment_status AS orderPaymentStatus,o.status AS orderStatus,t.name AS tableName FROM payments p JOIN orders o ON o.id=p.order_id JOIN cafe_tables t ON t.id=o.table_id WHERE p.cafe_id=? AND (?='' OR p.method=?) AND (?='' OR p.status=?) AND (?='' OR p.created_at>=?) AND (?='' OR p.created_at<=?) ORDER BY p.created_at DESC LIMIT 500`).all(adminCafe(req),method,method,status,status,from,from,to,to);
   res.json({ payments: rows });
 });
 app.patch('/api/admin/payments/:id/collect', requireAdmin, async (req, res) => {

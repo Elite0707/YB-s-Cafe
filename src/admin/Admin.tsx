@@ -13,6 +13,19 @@ type DashboardData = {
 };
 type TableRow = { id: string; name: string; qrToken: string; active?: boolean; isActive?: boolean; openOrders?: number; createdAt?: string };
 type PaymentRow = { id: string; orderNumber?: string; orderStatus?: string; amountCents: number; method: string; status: string; reference?: string; refundReference?: string; createdAt: string; orderId?: string };
+const orderDateRanges = [{ value: "today", label: "Today" }, { value: "yesterday", label: "Yesterday" }, { value: "7d", label: "Last 7 days" }, { value: "30d", label: "Last 30 days" }, { value: "all", label: "All time" }];
+function addDateRange(query: URLSearchParams, range: string) {
+  if (range === "all") return;
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let from = new Date(todayStart);
+  let to = now;
+  if (range === "yesterday") { from.setDate(from.getDate() - 1); to = new Date(todayStart.getTime() - 1); }
+  else if (range === "7d") from.setDate(from.getDate() - 6);
+  else if (range === "30d") from.setDate(from.getDate() - 29);
+  query.set("from", from.toISOString());
+  query.set("to", to.toISOString());
+}
 
 const unwrap = <T,>(value: T | { data: T }) => (value as { data?: T }).data ?? value as T;
 
@@ -135,11 +148,11 @@ function Dashboard({ cafe }: { cafe: Cafe }) {
 function MetricCard({ label, value, icon, tone, foot }: { label: string; value: string; icon: React.ReactNode; tone: string; foot: React.ReactNode }) { return <article className="metric-card"><div className="metric-card-top"><span>{label}</span><span className={`metric-icon ${tone}`}>{icon}</span></div><b className="metric-value">{value}</b><div className="metric-foot">{foot}</div></article>; }
 
 function OrdersPage({ cafe }: { cafe: Cafe }) {
-  const [orders, setOrders] = useState<Order[]>([]); const [status, setStatus] = useState("ALL"); const [query, setQuery] = useState(""); const [loading, setLoading] = useState(true); const [error, setError] = useState(""); const [busyId, setBusyId] = useState(""); const [selected, setSelected] = useState<Order | null>(null);
-  const load = useCallback(() => { setLoading(true); const params = new URLSearchParams(); if (status !== "ALL") params.set("status", status); if (query.trim()) params.set("q", query.trim()); api<{ orders: Order[] } | Order[]>(`/api/admin/orders?${params}`).then((result) => { setOrders(Array.isArray(result) ? result : result.orders ?? []); setError(""); }).catch((reason) => setError(friendlyError(reason))).finally(() => setLoading(false)); }, [status, query]);
+  const [orders, setOrders] = useState<Order[]>([]); const [status, setStatus] = useState("ALL"); const [query, setQuery] = useState(""); const [dateRange, setDateRange] = useState("today"); const [loading, setLoading] = useState(true); const [error, setError] = useState(""); const [busyId, setBusyId] = useState(""); const [selected, setSelected] = useState<Order | null>(null);
+  const load = useCallback(() => { setLoading(true); const params = new URLSearchParams(); if (status !== "ALL") params.set("status", status); if (query.trim()) params.set("q", query.trim()); addDateRange(params, dateRange); api<{ orders: Order[] } | Order[]>(`/api/admin/orders?${params}`).then((result) => { setOrders(Array.isArray(result) ? result : result.orders ?? []); setError(""); }).catch((reason) => setError(friendlyError(reason))).finally(() => setLoading(false)); }, [status, query, dateRange]);
   useEffect(() => { void load(); const interval = window.setInterval(() => void load(), 10000); return () => window.clearInterval(interval); }, [load]);
   async function updateOrder(order: Order, nextStatus: string) { let cancellationReason: string | undefined; if (nextStatus === "CANCELLED") { cancellationReason = window.prompt("Why is this order being cancelled?", "Unable to fulfill this order") || undefined; if (!cancellationReason) return; } setBusyId(order.id); try { await api(`/api/admin/orders/${encodeURIComponent(order.id)}`, { method: "PATCH", body: jsonBody({ status: nextStatus, cancellationReason }) }); await load(); if (selected?.id === order.id) setSelected({ ...order, status: nextStatus }); } catch (reason) { setError(friendlyError(reason)); } finally { setBusyId(""); } }
-  return <><div className="page-heading-row"><div><span className="eyebrow eyebrow-muted">THE HEART OF YOUR CAFE</span><h1>Orders <em>in motion.</em></h1><p>See what's brewing and keep everything moving along.</p></div><div className="heading-live"><span className="live-pill"><span /> Live queue</span><button className="button button-outline" onClick={() => window.print()}><Printer size={15} /> Print queue</button></div></div><div className="orders-toolbar"><div className="order-tabs">{["ALL", "PENDING", "CONFIRMED", "PREPARING", "READY", "COMPLETED"].map((value) => <button className={status === value ? "order-tab active" : "order-tab"} key={value} onClick={() => setStatus(value)}>{value === "ALL" ? "All orders" : value[0] + value.slice(1).toLowerCase()}</button>)}</div><label className="admin-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Find an order…" /><kbd>/</kbd></label></div>{error && <InlineError message={error} retry={load} />}
+  return <><div className="page-heading-row"><div><span className="eyebrow eyebrow-muted">THE HEART OF YOUR CAFE</span><h1>Orders <em>in motion.</em></h1><p>See what's brewing and keep everything moving along.</p></div><div className="heading-live"><span className="live-pill"><span /> Live queue</span><button className="button button-outline" onClick={() => window.print()}><Printer size={15} /> Print queue</button></div></div><div className="orders-toolbar"><div className="order-tabs">{["ALL", "PENDING", "CONFIRMED", "PREPARING", "READY", "COMPLETED"].map((value) => <button className={status === value ? "order-tab active" : "order-tab"} key={value} onClick={() => setStatus(value)}>{value === "ALL" ? "All orders" : value[0] + value.slice(1).toLowerCase()}</button>)}</div><div className="order-filter-actions"><label className="field-label date-filter"><CalendarDays size={15} /><span className="sr-only">Order date</span><select value={dateRange} onChange={(event) => setDateRange(event.target.value)}>{orderDateRanges.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select><ChevronDown size={14} /></label><label className="admin-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Find an order…" /><kbd>/</kbd></label></div></div>{error && <InlineError message={error} retry={load} />}
     <section className="order-list-panel"><div className="order-list-head"><span>ORDER</span><span>TABLE</span><span>PLACED</span><span>ITEMS</span><span>PAYMENT</span><span>TOTAL</span><span>STATUS</span><span /></div>{loading && !orders.length ? <div className="table-loading"><span className="loader" /> Loading the order queue…</div> : orders.length ? orders.map((order) => <div className="order-list-row" key={order.id}><button className="order-num-button" onClick={() => setSelected(order)}>#{order.orderNumber}<small>{order.items.reduce((sum, item) => sum + item.quantity, 0)} items</small></button><span className="table-name-cell">{order.tableName || order.table?.name || order.table?.label || "—"}</span><span>{new Date(order.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span><span className="order-items-preview">{order.items.slice(0, 2).map((item) => `${item.quantity}× ${item.name}`).join(", ")}{order.items.length > 2 ? ` +${order.items.length - 2}` : ""}</span><span className={`payment-text ${statusTone(order.paymentStatus)}`}>{order.paymentStatus.replaceAll("_", " ").toLowerCase()}</span><b>{formatMoney(order.totalCents, cafe.currency)}</b><span className={`status-badge tone-${statusTone(order.status)}`}>{order.status.toLowerCase()}</span><button className="row-arrow icon-button" onClick={() => setSelected(order)} aria-label={`View order ${order.orderNumber}`}><ArrowRight size={16} /></button></div>) : <EmptyTable title="It's quiet at the moment" copy="New QR orders will land right here." icon={<ShoppingBag size={22} />} />}</section>
     {selected && <OrderDetail order={selected} cafe={cafe} busy={busyId === selected.id} onClose={() => setSelected(null)} onUpdate={(next) => updateOrder(selected, next)} />}
   </>;
@@ -173,7 +186,7 @@ function CategoryManager({ categories, onClose, onChanged }: { categories: Categ
   const [name, setName] = useState(""); const [error, setError] = useState(""); const [busy, setBusy] = useState(false);
   async function add(event: FormEvent) { event.preventDefault(); setBusy(true); try { await api("/api/admin/categories", { method: "POST", body: jsonBody({ name }) }); setName(""); setError(""); onChanged(); } catch (reason) { setError(friendlyError(reason)); } finally { setBusy(false); } }
   async function remove(entry: Category) { if (!window.confirm(`Delete ${entry.name}?`)) return; try { await api(`/api/admin/categories/${entry.id}`, { method: "DELETE" }); onChanged(); } catch (reason) { setError(friendlyError(reason)); } }
-  return <div className="sheet-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><aside className="admin-detail-sheet category-sheet" role="dialog" aria-modal="true"><div className="sheet-head"><button className="icon-button" onClick={onClose} aria-label="Close categories"><X size={20} /></button><div><span className="eyebrow eyebrow-muted">KEEP IT TIDY</span><h2>Menu categories</h2></div></div><p className="sheet-intro">Group your menu so guests can find what they’re in the mood for.</p><div className="category-manager-list">{categories.map((entry) => <div key={entry.id}><span className="category-manager-icon"><BookOpen size={15} /></span><b>{entry.name}</b><button className="icon-button danger-action" onClick={() => void remove(entry)} aria-label={`Delete category ${entry.name}`}><X size={15} /></button></div>)}</div><form className="category-add-form" onSubmit={add}><label className="field-label">Add a new category<input value={name} onChange={(event) => setName(event.target.value)} required minLength={2} maxLength={60} placeholder="Seasonal specials" /></label>{error && <p className="inline-error">{error}</p>}<button className="button button-dark button-full" disabled={busy}>{busy ? "Adding…" : <><Plus size={15} /> Add category</>}</button></form></aside></div>;
+  return <div className="sheet-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><aside className="admin-detail-sheet category-sheet" role="dialog" aria-modal="true"><div className="sheet-head"><button className="icon-button" onClick={onClose} aria-label="Close categories"><X size={20} /></button><div><span className="eyebrow eyebrow-muted">KEEP IT TIDY</span><h2>Menu categories</h2></div></div><p className="sheet-intro">Group your menu so guests can find what they’re in the mood for.</p><div className="category-list-heading"><span>YOUR MENU SECTIONS</span><b>{categories.length}</b></div><div className="category-manager-list">{categories.length ? categories.map((entry, index) => <div key={entry.id}><span className="category-manager-index">{String(index + 1).padStart(2, "0")}</span><span className="category-manager-icon"><BookOpen size={16} /></span><span className="category-manager-copy"><b>{entry.name}</b><small>Menu section</small></span><button className="icon-button danger-action" onClick={() => void remove(entry)} aria-label={`Delete category ${entry.name}`}><X size={15} /></button></div>) : <p className="category-empty">Add your first section below to start organizing the menu.</p>}</div><form className="category-add-form" onSubmit={add}><label className="field-label">Add a new category<input value={name} onChange={(event) => setName(event.target.value)} required minLength={2} maxLength={60} placeholder="Seasonal specials" /></label>{error && <p className="inline-error">{error}</p>}<button className="button button-dark button-full" disabled={busy}>{busy ? "Adding…" : <><Plus size={15} /> Add category</>}</button></form></aside></div>;
 }
 
 function TablesPage({ cafe }: { cafe: Cafe }) {
@@ -191,6 +204,7 @@ function PaymentsPage({ cafe }: { cafe: Cafe }) {
   const [rows, setRows] = useState<PaymentRow[]>([]);
   const [method, setMethod] = useState("");
   const [status, setStatus] = useState("");
+  const [dateRange, setDateRange] = useState("today");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [collecting, setCollecting] = useState("");
@@ -203,11 +217,12 @@ function PaymentsPage({ cafe }: { cafe: Cafe }) {
     const query = new URLSearchParams();
     if (method) query.set("method", method);
     if (status) query.set("status", status);
+    addDateRange(query, dateRange);
     api<{ payments: PaymentRow[] }>(`/api/admin/payments?${query}`)
       .then((value) => setRows(value.payments ?? []))
       .catch((reason) => setError(friendlyError(reason)))
       .finally(() => setLoading(false));
-  }, [method, status]);
+  }, [method, status, dateRange]);
   useEffect(() => { void load(); }, [load]);
   async function collect(row: PaymentRow) {
     try {
@@ -244,6 +259,7 @@ function PaymentsPage({ cafe }: { cafe: Cafe }) {
     <div className="payment-filters">
       <label className="field-label">Method<select value={method} onChange={(event) => setMethod(event.target.value)}><option value="">All methods</option><option value="CASH_COUNTER">Cash at counter</option><option value="CASH_TABLE">Cash at table</option><option value="ONLINE">Online</option></select></label>
       <label className="field-label">Status<select value={status} onChange={(event) => setStatus(event.target.value)}><option value="">All statuses</option><option value="PAID">Paid</option><option value="UNPAID">Unpaid</option><option value="PENDING">Pending</option><option value="FAILED">Failed</option><option value="REFUNDED">Refunded</option></select></label>
+      <label className="field-label">Date<select value={dateRange} onChange={(event) => setDateRange(event.target.value)}>{orderDateRanges.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
     </div>
     <section className="order-list-panel">
       <div className="payment-list-head"><span>TRANSACTION</span><span>ORDER</span><span>METHOD</span><span>REFERENCE</span><span>DATE</span><span>AMOUNT</span><span>STATUS</span><span /></div>

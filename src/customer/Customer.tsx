@@ -19,6 +19,11 @@ function rememberOrderToken(tableToken: string, trackingToken: string) {
   const tokens = [trackingToken, ...readOrderTokens(tableToken).filter((entry) => entry !== trackingToken)].slice(0, 5);
   localStorage.setItem(orderHistoryKey(tableToken), JSON.stringify(tokens));
 }
+function isTodayOrder(createdAt: string) {
+  const orderDate = new Date(createdAt);
+  const today = new Date();
+  return Number.isFinite(orderDate.getTime()) && orderDate.getFullYear() === today.getFullYear() && orderDate.getMonth() === today.getMonth() && orderDate.getDate() === today.getDate();
+}
 
 export function CustomerMenu() {
   const { qrToken = "" } = useParams();
@@ -53,7 +58,11 @@ export function CustomerMenu() {
     Promise.all(tokens.map(async (token) => {
       try { const value = await api<{ order: Order }>(`/api/public/orders/${encodeURIComponent(token)}`); return { token, order: value.order }; }
       catch { return null; }
-    })).then((orders) => { if (alive) setRecentOrders(orders.filter((entry): entry is { token: string; order: Order } => !!entry)); });
+    })).then((orders) => { if (alive) {
+      const todaysOrders = orders.filter((entry): entry is { token: string; order: Order } => !!entry && isTodayOrder(entry.order.createdAt));
+      setRecentOrders(todaysOrders);
+      localStorage.setItem(orderHistoryKey(qrToken), JSON.stringify(todaysOrders.map((entry) => entry.token)));
+    } });
     return () => { alive = false; };
   }, [qrToken]);
   useEffect(() => { if (menu && !menu.cafe.onlinePaymentsEnabled && paymentMethod === "ONLINE") setPaymentMethod("CASH_COUNTER"); }, [menu, paymentMethod]);
@@ -74,11 +83,11 @@ export function CustomerMenu() {
   function changeQuantity(key: string, change: number) {
     setCart((previous) => previous.map((line) => line.key === key ? { ...line, quantity: line.quantity + change } : line).filter((line) => line.quantity > 0));
   }
-  function addToCart(item: MenuItem, optionChoiceIds: string[] = [], notes = "") {
+  function addToCart(item: MenuItem, optionChoiceIds: string[] = [], notes = "", quantity = 1) {
     const key = lineKey(item.id, optionChoiceIds, notes);
     setCart((previous) => {
       const existing = previous.find((line) => line.key === key);
-      return existing ? previous.map((line) => line.key === key ? { ...line, quantity: line.quantity + 1 } : line) : [...previous, { key, itemId: item.id, quantity: 1, optionChoiceIds, notes }];
+      return existing ? previous.map((line) => line.key === key ? { ...line, quantity: line.quantity + quantity } : line) : [...previous, { key, itemId: item.id, quantity, optionChoiceIds, notes }];
     });
     setSelectedItem(null);
     setNotice(`${item.name} added to your bag`);
@@ -146,26 +155,30 @@ function MenuCard({ item, currency, onSelect }: { item: MenuItem; currency: stri
   </article>;
 }
 
-function ItemModal({ item, currency, onClose, onAdd }: { item: MenuItem; currency: string; onClose: () => void; onAdd: (item: MenuItem, choiceIds: string[], notes: string) => void }) {
+function ItemModal({ item, currency, onClose, onAdd }: { item: MenuItem; currency: string; onClose: () => void; onAdd: (item: MenuItem, choiceIds: string[], notes: string, quantity: number) => void }) {
   const [choiceIds, setChoiceIds] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
   const [validation, setValidation] = useState("");
+  const [quantity, setQuantity] = useState(1);
   const selectedAddOn = (item.options ?? []).flatMap((group) => group.choices).filter((choice) => choiceIds.includes(choice.id)).reduce((sum, choice) => sum + choice.priceDeltaCents, 0);
   function toggle(group: OptionGroup, choiceId: string) {
-    setChoiceIds((ids) => [...ids.filter((id) => !group.choices.some((choice) => choice.id === id)), choiceId]);
+    setChoiceIds((ids) => ids.includes(choiceId) && !group.required
+      ? ids.filter((id) => id !== choiceId)
+      : [...ids.filter((id) => !group.choices.some((choice) => choice.id === id)), choiceId]);
     setValidation("");
   }
   function add() {
     const missing = (item.options ?? []).some((group) => group.required && !group.choices.some((choice) => choiceIds.includes(choice.id)));
     if (missing) { setValidation("Choose one option to continue."); return; }
-    onAdd(item, choiceIds, notes);
+    onAdd(item, choiceIds, notes, quantity);
   }
   return <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><section className="item-modal" role="dialog" aria-modal="true" aria-labelledby="item-modal-title">
     <button className="modal-close icon-button" onClick={onClose} aria-label="Close item details"><X size={20} /></button>
     <div className="modal-photo">{item.imageUrl ? <img src={item.imageUrl} alt={item.name} /> : <div className="food-placeholder food-placeholder-large"><span>{item.name.slice(0, 1)}</span></div>}</div>
     <div className="modal-content"><div className="modal-heading"><div><span className="eyebrow eyebrow-muted">MADE TO ORDER</span><h2 id="item-modal-title">{item.name}</h2></div><b>{formatMoney(item.priceCents + selectedAddOn, currency)}</b></div><p className="modal-description">{item.description}</p>{item.allergens?.length ? <p className="allergen-note">Contains: {item.allergens.join(", ")}</p> : null}
-      {(item.options ?? []).map((group) => <fieldset className="option-group" key={group.id}><legend>{group.label}<span>{group.required ? "Choose one" : "Optional · one choice"}</span></legend>{group.choices.map((choice) => <label key={choice.id} className="option-choice"><span><b>{choice.label}</b>{choice.priceDeltaCents > 0 && <small>+ {formatMoney(choice.priceDeltaCents, currency)}</small>}</span><input type="radio" name={`choice-${item.id}-${group.id}`} checked={choiceIds.includes(choice.id)} onChange={() => toggle(group, choice.id)} aria-label={`${choice.label}${choice.priceDeltaCents ? ` plus ${formatMoney(choice.priceDeltaCents, currency)}` : ""}`} /><span className="custom-check"><Check size={12} /></span></label>)}</fieldset>)}
-      <label className="field-label">A note for the barista <span>Optional</span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Oat milk, extra hot, no rush…" maxLength={180} /></label>{validation && <p role="alert" className="inline-error">{validation}</p>}<button className="button button-dark button-full" onClick={add}>Add to my order <span>{formatMoney(item.priceCents + selectedAddOn, currency)}</span></button></div>
+      {(item.options ?? []).map((group) => <fieldset className="option-group" key={group.id}><legend>{group.label}<span>{group.required ? "Choose one" : "Optional · one choice"}</span></legend>{group.choices.map((choice) => <label key={choice.id} className="option-choice"><span><b>{choice.label}</b>{choice.priceDeltaCents > 0 && <small>+ {formatMoney(choice.priceDeltaCents, currency)}</small>}</span><input type="radio" name={`choice-${item.id}-${group.id}`} checked={choiceIds.includes(choice.id)} onClick={(event) => { if (choiceIds.includes(choice.id) && !group.required) { event.preventDefault(); toggle(group, choice.id); } }} onChange={() => toggle(group, choice.id)} aria-label={`${choice.label}${choice.priceDeltaCents ? ` plus ${formatMoney(choice.priceDeltaCents, currency)}` : ""}`} /><span className="custom-check"><Check size={12} /></span></label>)}{!group.required && group.choices.some((choice) => choiceIds.includes(choice.id)) && <button type="button" className="option-clear" onClick={() => setChoiceIds((ids) => ids.filter((id) => !group.choices.some((choice) => choice.id === id)))}>Remove selection</button>}</fieldset>)}
+      <div className="item-quantity-row"><span><b>Quantity</b><small>Count for this customization</small></span><div><button type="button" aria-label="Decrease quantity" disabled={quantity <= 1} onClick={() => setQuantity((value) => Math.max(1, value - 1))}><Minus size={15} /></button><b>{quantity}</b><button type="button" aria-label="Increase quantity" disabled={quantity >= 30} onClick={() => setQuantity((value) => Math.min(30, value + 1))}><Plus size={15} /></button></div></div>
+      <label className="field-label">A note for the barista <span>Optional</span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Oat milk, extra hot, no rush…" maxLength={180} /></label>{validation && <p role="alert" className="inline-error">{validation}</p>}<button className="button button-dark button-full" onClick={add}>Add {quantity} to my order <span>{formatMoney((item.priceCents + selectedAddOn) * quantity, currency)}</span></button></div>
   </section></div>;
 }
 

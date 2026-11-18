@@ -191,10 +191,10 @@ export function OrderTracking() {
   if (loading) return <div className="customer-loading"><span className="loader" /><p>Finding your order…</p></div>;
   if (error && !order) return <main className="order-state-page"><div className="order-state-card"><span className="status-emblem">?</span><h1>We can’t find that order</h1><p>{error}</p><a className="button button-dark" href="/">Back to cafe home</a></div></main>;
   if (!order) return null;
-  const stages = ["PENDING", "CONFIRMED", "PREPARING", "READY", "SERVED", "COMPLETED"];
-  const currentIndex = stages.indexOf(order.status.toUpperCase());
+  const stageIndex: Record<string, number> = { PENDING: 0, CONFIRMED: 1, PREPARING: 1, READY: 2, SERVED: 3, COMPLETED: 3 };
+  const currentIndex = stageIndex[order.status.toUpperCase()] ?? 0;
   const cancelled = order.status.toUpperCase() === "CANCELLED";
-  const stageLabels = ["Order received", "Confirmed", "Being prepared", "Ready to enjoy", "Served", "All yours"];
+  const stageLabels = ["Order received", "Being prepared", "Ready to enjoy", "All yours"];
   return <main className="order-state-page"><div className="order-state-card">
     <div className="order-state-top"><Link className="back-link" to={order.menuPath || "/"}> <ArrowLeft size={15} /> Back to menu</Link><ThemeToggle /></div>
     <div className={cancelled ? "status-emblem status-cancelled" : "status-emblem"}>{cancelled ? "×" : currentIndex >= 3 ? "✓" : <span className="pulse-dot" />}</div>

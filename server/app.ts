@@ -531,7 +531,7 @@ app.patch('/api/admin/tables/:id', requireAdmin, async (req, res) => {
 app.delete('/api/admin/tables/:id', requireAdmin, async (req, res) => { const result = await db.prepare('UPDATE cafe_tables SET active=0 WHERE id=? AND cafe_id=?').run(req.params.id,adminCafe(req)); result.changes ? res.json({ ok: true }) : res.status(404).json({ error: 'Table not found.' }); });
 
 const statuses = ['PENDING','CONFIRMED','PREPARING','READY','SERVED','COMPLETED','CANCELLED'] as const;
-const transitions: Record<string, string[]> = { PENDING: ['CONFIRMED','CANCELLED'], CONFIRMED: ['PREPARING','CANCELLED'], PREPARING: ['READY','CANCELLED'], READY: ['SERVED','CANCELLED'], SERVED: ['COMPLETED'], COMPLETED: [], CANCELLED: [] };
+const transitions: Record<string, string[]> = { PENDING: ['CONFIRMED','PREPARING','CANCELLED'], CONFIRMED: ['PREPARING','CANCELLED'], PREPARING: ['READY','CANCELLED'], READY: ['SERVED','COMPLETED','CANCELLED'], SERVED: ['COMPLETED'], COMPLETED: [], CANCELLED: [] };
 app.get('/api/admin/orders', requireAdmin, async (req, res) => {
   const cafe = adminCafe(req); const status = String(req.query.status || ''); const q = String(req.query.q || '').trim().slice(0, 80);
   const from = typeof req.query.from === 'string' ? req.query.from : ''; const to = typeof req.query.to === 'string' ? req.query.to : '';
@@ -552,6 +552,41 @@ app.patch('/api/admin/orders/:id', requireAdmin, async (req, res) => {
   const at = nowIso(); await db.prepare('UPDATE orders SET status=?,cancellation_reason=?,updated_at=? WHERE id=? AND cafe_id=?').run(data.data.status,data.data.status === 'CANCELLED' ? data.data.cancellationReason : row.cancellation_reason,at,req.params.id,adminCafe(req));
   const updated = { ...row, status: data.data.status, cancellation_reason: data.data.status === 'CANCELLED' ? data.data.cancellationReason : row.cancellation_reason, updated_at: at };
   res.json({ order: await presentOrder(updated, false) });
+});
+
+app.post('/api/admin/orders/:id/complete', requireAdmin, async (req, res) => {
+  const data = z.object({ reference: z.string().trim().max(120).optional() }).safeParse(req.body ?? {});
+  if (!data.success) return res.status(400).json({ error: 'Receipt reference must be 120 characters or fewer.' });
+  const cafeId = adminCafe(req); const at = nowIso();
+  const transaction = db.transaction(async () => {
+    const order = await db.prepare(`SELECT o.*,t.name AS table_name,t.qr_token AS table_qr_token,c.name AS cafe_name,c.currency
+      FROM orders o JOIN cafe_tables t ON t.id=o.table_id JOIN cafes c ON c.id=o.cafe_id
+      WHERE o.id=? AND o.cafe_id=? FOR UPDATE OF o`).get(req.params.id,cafeId) as any;
+    if (!order) return { kind: 'MISSING' as const };
+    if (order.status === 'COMPLETED' && order.payment_status === 'PAID') return { kind: 'OK' as const, order };
+    if (!['READY','SERVED'].includes(order.status)) return { kind: 'INVALID_STATUS' as const };
+    if (order.payment_status === 'REFUNDED') return { kind: 'REFUNDED' as const };
+
+    const payment = await db.prepare('SELECT id,method,status FROM payments WHERE order_id=? AND cafe_id=? FOR UPDATE').get(order.id,cafeId) as any;
+    if (!payment) return { kind: 'MISSING_PAYMENT' as const };
+    if (payment.status === 'REFUNDED') return { kind: 'REFUNDED' as const };
+    if (payment.method === 'ONLINE' && payment.status !== 'PAID') return { kind: 'ONLINE_PENDING' as const };
+    if (!['CASH_COUNTER','CASH_TABLE','ONLINE'].includes(payment.method)) return { kind: 'INVALID_PAYMENT_METHOD' as const };
+
+    if (payment.status !== 'PAID') {
+      await db.prepare("UPDATE payments SET status='PAID',provider_reference=COALESCE(?,provider_reference),updated_at=? WHERE id=? AND cafe_id=? AND status!='REFUNDED'").run(data.data.reference || null,at,payment.id,cafeId);
+    }
+    await db.prepare("UPDATE orders SET status='COMPLETED',payment_status='PAID',updated_at=? WHERE id=? AND cafe_id=?").run(at,order.id,cafeId);
+    return { kind: 'OK' as const, order: { ...order, status: 'COMPLETED', payment_status: 'PAID', updated_at: at } };
+  });
+  const result = await transaction();
+  if (result.kind === 'MISSING') return res.status(404).json({ error: 'Order not found.' });
+  if (result.kind === 'MISSING_PAYMENT') return res.status(409).json({ error: 'The payment record is missing. Review this order in Payments.' });
+  if (result.kind === 'INVALID_STATUS') return res.status(409).json({ error: 'Only ready or served orders can be completed.' });
+  if (result.kind === 'REFUNDED') return res.status(409).json({ error: 'A refunded order cannot be completed.' });
+  if (result.kind === 'ONLINE_PENDING') return res.status(409).json({ error: 'Wait for the online payment to be confirmed before completing this order.' });
+  if (result.kind === 'INVALID_PAYMENT_METHOD') return res.status(409).json({ error: 'This order has an unsupported payment method.' });
+  res.json({ order: await presentOrder(result.order,false) });
 });
 
 app.get('/api/admin/payments', requireAdmin, async (req, res) => {

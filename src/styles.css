@@ -557,6 +557,10 @@ kbd { min-width: 22px; border: 1px solid #e8e8df; border-radius: 5px; padding: 2
 .detail-payment { display: flex; justify-content: space-between; margin-top: 14px; color: #92998f; font-size: 13px; }
 .detail-actions { display: grid; gap: 8px; margin-top: 19px; }
 .detail-actions .button { min-height: 41px; font-size: 13px; }
+.payment-wait-note { color: #8d978c; font-size: 12px; line-height: 1.5; text-align: center; }
+.order-completion-backdrop { z-index: 55; }
+.completion-modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.completion-modal-actions .button { min-height: 39px; padding: 0 12px; font-size: 12px; }
 .menu-editor-sheet { width: min(540px,100%); }
 .editor-form { display: grid; gap: 14px; overflow-y: auto; padding: 17px 0 6px; }
 .editor-form .field-label { font-size: 13px; }
@@ -1076,6 +1080,7 @@ kbd { min-width: 22px; border: 1px solid #e8e8df; border-radius: 5px; padding: 2
   [data-theme="dark"] .payment-choice { border-color: #3b473e; background: #202a23; }
   [data-theme="dark"] .payment-choice:hover, [data-theme="dark"] .payment-choice.selected { border-color: #71896d; background: #29392e; }
   [data-theme="dark"] .payment-choice small, [data-theme="dark"] .option-group legend span { color: #a6b1a5; }
+  [data-theme="dark"] .payment-wait-note { color: #a6b1a5; }
   [data-theme="dark"] .payment-choice-icon { color: #c2d4b6; background: #304030; }
   [data-theme="dark"] .payment-choice:nth-of-type(2) .payment-choice-icon { color: #e3b18b; background: #46362b; }
   [data-theme="dark"] .payment-choice:nth-of-type(3) .payment-choice-icon { color: #cec1e4; background: #393345; }

@@ -685,8 +685,11 @@ app.get('/api/admin/payments.csv', requireAdmin, async (req, res) => {
 app.get('/api/admin/reports.csv', requireAdmin, async (req, res) => {
   const from = typeof req.query.from === 'string' ? req.query.from : new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
   const to = typeof req.query.to === 'string' ? req.query.to : new Date().toISOString().slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || from > to) return res.status(400).json({ error: 'Use valid from/to dates.' });
-  const rows = await db.prepare(`SELECT o.order_number,t.name AS table_name,o.created_at,o.status,o.payment_method,o.payment_status,o.subtotal_cents,o.tax_cents,o.total_cents,c.currency,STRING_AGG(oi.quantity::text || 'x ' || oi.item_name, '; ') AS items FROM orders o JOIN cafe_tables t ON t.id=o.table_id JOIN cafes c ON c.id=o.cafe_id LEFT JOIN order_items oi ON oi.order_id=o.id WHERE o.cafe_id=? AND o.created_at>=? AND o.created_at<=? GROUP BY o.id,t.name,c.currency ORDER BY o.created_at`).all(adminCafe(req),`${from}T00:00:00.000Z`,`${to}T23:59:59.999Z`) as any[];
+  const dateOnly = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value);
+  const fromTime = dateOnly(from) ? Date.parse(`${from}T00:00:00.000Z`) : Date.parse(from);
+  const toTime = dateOnly(to) ? Date.parse(`${to}T23:59:59.999Z`) : Date.parse(to);
+  if (!Number.isFinite(fromTime) || !Number.isFinite(toTime) || fromTime > toTime) return res.status(400).json({ error: 'Use valid from/to dates.' });
+  const rows = await db.prepare(`SELECT o.order_number,t.name AS table_name,o.created_at,o.status,o.payment_method,o.payment_status,o.subtotal_cents,o.tax_cents,o.total_cents,c.currency,STRING_AGG(oi.quantity::text || 'x ' || oi.item_name, '; ') AS items FROM orders o JOIN cafe_tables t ON t.id=o.table_id JOIN cafes c ON c.id=o.cafe_id LEFT JOIN order_items oi ON oi.order_id=o.id WHERE o.cafe_id=? AND o.created_at>=? AND o.created_at<=? GROUP BY o.id,t.name,c.currency ORDER BY o.created_at`).all(adminCafe(req),new Date(fromTime).toISOString(),new Date(toTime).toISOString()) as any[];
   const csvCell = (value: unknown) => {
     let text = String(value ?? '');
     if (/^[\s]*[=+\-@]/.test(text)) text = `'${text}`;
@@ -694,7 +697,7 @@ app.get('/api/admin/reports.csv', requireAdmin, async (req, res) => {
   };
   const lines = [['order_number','table','created_at','status','payment_method','payment_status','subtotal_rupees','tax_rupees','total_rupees','items'].map(csvCell).join(',')];
   for (const row of rows) lines.push([row.order_number,row.table_name,row.created_at,row.status,row.payment_method,row.payment_status,formatCsvMoney(row.subtotal_cents,row.currency),formatCsvMoney(row.tax_cents,row.currency),formatCsvMoney(row.total_cents,row.currency),row.items].map(csvCell).join(','));
-  res.type('text/csv').attachment(`cafe-orders-${from}-to-${to}.csv`).send(`\uFEFF${lines.join('\r\n')}`);
+  res.type('text/csv').attachment(`cafe-orders-${from.slice(0,10)}-to-${to.slice(0,10)}.csv`).send(`\uFEFF${lines.join('\r\n')}`);
 });
 
 app.use((error: any, _req: Request, res: Response, _next: NextFunction) => {

@@ -19,7 +19,9 @@ function addDateRange(query: URLSearchParams, range: string) {
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   let from = new Date(todayStart);
-  let to = now;
+  let to = new Date(todayStart);
+  to.setDate(to.getDate() + 1);
+  to.setMilliseconds(to.getMilliseconds() - 1);
   if (range === "yesterday") { from.setDate(from.getDate() - 1); to = new Date(todayStart.getTime() - 1); }
   else if (range === "7d") from.setDate(from.getDate() - 6);
   else if (range === "30d") from.setDate(from.getDate() - 29);

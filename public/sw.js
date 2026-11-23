@@ -1,4 +1,4 @@
-const CACHE_NAME = "tablefolk-shell-v1";
+const CACHE_NAME = "tablefolk-shell-v2";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/icon.svg"];
 
 self.addEventListener("install", (event) => {
@@ -24,9 +24,18 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (url.pathname.startsWith("/assets/") || APP_SHELL.includes(url.pathname)) {
-    event.respondWith(caches.match(request).then((cached) => cached || fetch(request).then((response) => {
-      if (response.ok) caches.open(CACHE_NAME).then((cache) => cache.put(request, response.clone()));
+    event.respondWith((async () => {
+      const cached = await caches.match(request);
+      if (cached) return cached;
+
+      const response = await fetch(request);
+      if (response.ok) {
+        // Clone before handing the original response back to the browser. Once
+        // it is returned, its body may be consumed before an async clone runs.
+        const copy = response.clone();
+        event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)));
+      }
       return response;
-    })));
+    })());
   }
 });
